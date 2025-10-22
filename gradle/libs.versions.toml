@@ -1,0 +1,26 @@
+[versions]
+kotlin = "2.1.20"
+jackson = "2.15.2"
+spring = "3.3.3"
+simbot = "4.14.0"
+simbot-qq = "4.2.2"
+ktor = "2.3.12"
+spring-management = "1.1.6"
+
+[libraries]
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
+spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter", version.ref = "spring" }
+simbot-spring = { module = "love.forte.simbot:simbot-core-spring-boot-starter", version.ref = "simbot" }
+simbot-component-qq = { module = "love.forte.simbot.component:simbot-component-qq-guild-core", version.ref = "simbot-qq" }
+ktor-client-java = { module = "io.ktor:ktor-client-java", version.ref = "ktor" }
+spring-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-data-jdbc = { module = "org.springframework.boot:spring-boot-starter-data-jdbc" }
+mysql-connector = { module = "com.mysql:mysql-connector-j" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-plugin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
+spring = { id = "org.springframework.boot", version.ref = "spring" }
+spring-management = { id = "io.spring.dependency-management", version.ref = "spring-management" }
+
