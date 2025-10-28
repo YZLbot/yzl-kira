@@ -1,4 +1,4 @@
-package top.tbpdt.dataLoader
+package top.tbpdt.utils
 
 import jakarta.annotation.PostConstruct
 import kotlinx.serialization.json.Json
