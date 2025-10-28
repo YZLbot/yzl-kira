@@ -6,7 +6,7 @@ import love.forte.simbot.quantcat.common.annotations.ContentTrim
 import love.forte.simbot.quantcat.common.annotations.Filter
 import love.forte.simbot.quantcat.common.annotations.Listener
 import org.springframework.stereotype.Component
-import top.tbpdt.dataLoader.DivineJsonLoaderService
+import top.tbpdt.utils.DivineJsonLoaderService
 
 /**
  * @author Takeoff0518
