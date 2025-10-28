@@ -7,6 +7,7 @@ import love.forte.simbot.quantcat.common.annotations.ContentTrim
 import love.forte.simbot.quantcat.common.annotations.Filter
 import love.forte.simbot.quantcat.common.annotations.Listener
 import org.springframework.stereotype.Component
+import top.tbpdt.logger
 
 /**
  * 一个用于承载监听函数的事件处理器类。
@@ -25,13 +26,13 @@ class MyEventHandles {
     @Listener
     fun handleAllAndPrint(event: Event) {
         if (event::class.simpleName == "QGGroupSendSupportPostSendEventImpl") {
-            println("发送了信息！")
+            logger().info("发送了信息！")
         }
     }
 
     @Listener
     suspend fun handleMessageEvent(event: ChatGroupMessageEvent) {
-        println("[${event.content().name}(${event.content().id})] ${event.author().name}(${event.author().id}) -> ${event.messageContent.messages}")
+        logger().info("[${event.content().name}(${event.content().id})] ${event.author().name}(${event.author().id}) -> ${event.messageContent.messages}")
     }
 
     @Listener

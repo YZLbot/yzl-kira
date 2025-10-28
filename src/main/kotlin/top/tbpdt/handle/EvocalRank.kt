@@ -59,6 +59,8 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
             return
         }
 
+        event.content().send("加载中……".toText())
+
         val latestData = try {
             eVocalRankUtils.getLatestRank()
         } catch (e: Exception) {
@@ -76,24 +78,10 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
                 "发送 .vcrank [排名(1~30)] 以获取主榜详细信息~"
         println("尝试发送消息！")
         event.content().send(overviewStr.toText() + (image ?: "[视频封面获取失败]".toText()))
-//        var chain = emptyMessageChain()
-//        val result = ForwardMessageBuilder(group)
-//        chain += PlainText("主榜\n")
-//        for (i in latestData.main_rank) {
-//            chain += PlainText("#${i.rank} ${i.title}\n")
-//            if (i.rank % 10 == 0) {
-//                result.add(bot.id, bot.nick, chain)
-//                chain = emptyMessageChain()
-//            }
-//        }
-//        group.sendMessage(result.build())
         val builder = StringBuilder().append("\n")
         for (i in latestData.main_rank) {
-            builder.append("${i.rank}|${i.title}\n")
-            if (i.rank % 15 == 0) {
-                event.content().send(builder.toString().toText())
-                builder.clear()
-            }
+            builder.append("[${i.rank}]${i.title}\n")
         }
+        event.content().send(builder.toString().toText())
     }
 }

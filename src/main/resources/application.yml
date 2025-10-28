@@ -1,0 +1,16 @@
+logging:
+  level:
+    root: warn
+    top.tbpdt: debug
+  file:
+    name: logs/myapp.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level: %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36}: %msg%n"
+
+simbot:
+  # simbot.application: 与 Application 相关的配置
+  # simbot.bots: 与 bot 配置相关的属性。
+  bots:
+    configuration-json-resources:
+      - 'file:config/*.bot.json'

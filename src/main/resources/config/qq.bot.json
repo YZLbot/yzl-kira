@@ -1,0 +1,15 @@
+{
+  "component": "simbot.qqguild",
+  "ticket": {
+    "appId": "你的bot appid",
+    "secret": "你的bot secret",
+    "token": "你的bot token, 暂时不再会用到了, 目前无需填写"
+  },
+  "config": {
+    "serverUrl": "SANDBOX",
+    "intents": {
+      "type": "nameBased",
+      "names": ["Guilds", "PublicGuildMessages", "GROUP_AND_C2C_EVENT"]
+    }
+  }
+}

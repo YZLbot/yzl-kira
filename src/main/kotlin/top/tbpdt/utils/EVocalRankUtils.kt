@@ -18,6 +18,7 @@ import jakarta.annotation.PreDestroy
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.springframework.stereotype.Service
+import top.tbpdt.logger
 import java.io.IOException
 
 object PubDateSerializer : KSerializer<String> {
@@ -203,14 +204,12 @@ class EVocalRankUtils {
 
     suspend fun getImage(av: String, url: String): ByteArray? {
         val client = OkHttpClient()
-        println("尝试为 $av 获取封面 $url")
+        logger().info("尝试为 $av 获取封面 $url")
 
         val request = Request.Builder().url(url).header(
             "User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"
         ).build()
-
-//        var image: Image? = null
 
         return try {
             val response = client.newCall(request).execute()
