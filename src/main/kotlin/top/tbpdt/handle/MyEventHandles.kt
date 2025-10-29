@@ -1,6 +1,7 @@
 package top.tbpdt.handle
 
 import kotlinx.coroutines.delay
+import love.forte.simbot.common.PriorityConstant
 import love.forte.simbot.event.ChatGroupMessageEvent
 import love.forte.simbot.event.Event
 import love.forte.simbot.quantcat.common.annotations.ContentTrim
@@ -30,7 +31,7 @@ class MyEventHandles {
         }
     }
 
-    @Listener
+    @Listener(priority = PriorityConstant.PRIORITIZE_9)
     suspend fun handleMessageEvent(event: ChatGroupMessageEvent) {
         logger().info("[${event.content().name}(${event.content().id})] ${event.author().name}(${event.author().id}) -> ${event.messageContent.messages}")
     }
