@@ -6,14 +6,14 @@ import love.forte.simbot.quantcat.common.annotations.ContentTrim
 import love.forte.simbot.quantcat.common.annotations.Filter
 import love.forte.simbot.quantcat.common.annotations.Listener
 import org.springframework.stereotype.Component
-import top.tbpdt.utils.DivineJsonLoaderService
+import top.tbpdt.utils.JsonLoaderService
 
 /**
  * @author Takeoff0518
  */
 
 @Component
-class Divine(private val divineJsonLoaderService: DivineJsonLoaderService) {
+class Divine(private val jsonLoaderService: JsonLoaderService) {
 
     val userCache = mutableMapOf<String, Int>()
 
@@ -22,7 +22,7 @@ class Divine(private val divineJsonLoaderService: DivineJsonLoaderService) {
     @Filter("^/抽签$")
     suspend fun handleDraw(event: ChatGroupMessageEvent) {
         val randoms = (1..384).random()
-        val divContent = divineJsonLoaderService.jsonElement.jsonObject["$randoms"]?.jsonObject?.get("shi").toString().replace("\"", "")
+        val divContent = jsonLoaderService.divinationJsonElement.jsonObject["$randoms"]?.jsonObject?.get("shi").toString().replace("\"", "")
         val divResult = "\n\n[第 $randoms 签]\n\n$divContent"
         event.reply(divResult)
         userCache[event.authorId.toString()] = randoms
@@ -44,7 +44,7 @@ class Divine(private val divineJsonLoaderService: DivineJsonLoaderService) {
         }
 
         val divContent =
-            divineJsonLoaderService.jsonElement.jsonObject["$randoms"]?.jsonObject?.get("jie").toString().replace("\"", "")
+            jsonLoaderService.divinationJsonElement.jsonObject["$randoms"]?.jsonObject?.get("jie").toString().replace("\"", "")
         val divResult = "\n\n[第 $randoms 签: 解签]\n\n$divContent"
 
         event.reply(divResult)
