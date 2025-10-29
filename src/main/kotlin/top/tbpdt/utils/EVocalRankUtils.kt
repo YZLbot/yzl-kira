@@ -5,6 +5,8 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import jakarta.annotation.PostConstruct
+import jakarta.annotation.PreDestroy
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -13,8 +15,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
-import jakarta.annotation.PostConstruct
-import jakarta.annotation.PreDestroy
+import love.forte.simbot.component.qguild.message.ImageParser
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.springframework.stereotype.Service
@@ -205,6 +206,8 @@ class EVocalRankUtils {
     suspend fun getImage(av: String, url: String): ByteArray? {
         val client = OkHttpClient()
         logger().info("尝试为 $av 获取封面 $url")
+
+        ImageParser.disableBase64UploadWarn()
 
         val request = Request.Builder().url(url).header(
             "User-Agent",
