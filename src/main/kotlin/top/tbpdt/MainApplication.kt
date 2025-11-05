@@ -1,5 +1,6 @@
 package top.tbpdt
 
+import love.forte.simbot.component.qguild.message.ImageParser
 import love.forte.simbot.spring.EnableSimbot
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -17,5 +18,5 @@ class MainApplication
 
 fun main(args: Array<String>) {
     runApplication<MainApplication>(*args)
-    
+    ImageParser.disableBase64UploadWarn()
 }
