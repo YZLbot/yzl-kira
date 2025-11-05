@@ -34,5 +34,5 @@ For the good of the community as a whole, we strongly recommend that you do the 
 - [x] 中 V 周刊查询
 - [ ] 乐正绫周刊查询
 - [ ] 中 V PickUp 周刊查询
-- [ ] Wordie
+- [x] Wordle
 - [ ] Petpet
