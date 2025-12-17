@@ -33,6 +33,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json")
     implementation("io.ktor:ktor-client-cio:2.3.12")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.16.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.2")
 }
 
 kotlin {
