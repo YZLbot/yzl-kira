@@ -55,7 +55,7 @@ abstract class BaseYamlConfigManager<T : Any>(
     private var lastModified: Long = 0
 
     // 当前实例
-    protected var currentConfig: T? = null
+    protected var _currentConfig: T? = null
 
     // 配置变更监听器
     private val listeners = mutableListOf<(T) -> Unit>()
@@ -68,18 +68,20 @@ abstract class BaseYamlConfigManager<T : Any>(
         ensureConfigFileExists()
         loadExternalConfig()
         lastModified = configFile.lastModified()
-        return currentConfig!!
+        return _currentConfig!!
     }
 
     /**
      * 确保配置文件存在，如果不存在则创建默认配置
      */
-    private fun ensureConfigFileExists() {
+    private fun ensureConfigFileExists(): Boolean {
         if (!configFile.exists()) {
             configFile.parentFile.mkdirs()
             val defaultConfig = createDefaultConfig()
             objectMapper.writeValue(configFile, defaultConfig)
+            return false
         }
+        return true
     }
 
     /**
@@ -103,7 +105,7 @@ abstract class BaseYamlConfigManager<T : Any>(
             // 更新PropertySource
             updatePropertySource(configMap)
 
-            currentConfig = configInstance
+            _currentConfig = configInstance
             notifyListeners(configInstance)
 
             return configInstance
@@ -145,14 +147,13 @@ abstract class BaseYamlConfigManager<T : Any>(
     @Synchronized
     fun saveConfigToFile(config: T? = null): Boolean {
         try {
-            val configToSave = config ?: currentConfig ?: throw IllegalStateException("No config to save")
+            val configToSave = config ?: _currentConfig ?: throw IllegalStateException("No config to save")
 
             // 创建备份
             if (configFile.exists()) {
                 val backupFile = File(configFile.parent, "${configFile.name}.backup")
                 Files.copy(configFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
-
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(configFile, configToSave)
             lastModified = configFile.lastModified()
 
@@ -167,7 +168,7 @@ abstract class BaseYamlConfigManager<T : Any>(
      */
     @Synchronized
     fun getCurrentConfig(): T {
-        return currentConfig ?: throw IllegalStateException("Config not initialized")
+        return _currentConfig ?: throw IllegalStateException("Config not initialized")
     }
 
     /**
