@@ -16,11 +16,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 import love.forte.simbot.component.qguild.message.ImageParser
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.springframework.stereotype.Service
 import top.tbpdt.logger
-import java.io.IOException
+import java.io.File
 
 object PubDateSerializer : KSerializer<String> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("PubDate", PrimitiveKind.STRING)
@@ -173,9 +171,15 @@ data class Diff(
 @Service
 class EVocalRankUtils {
     private lateinit var client: HttpClient
+    private val cacheDir = File("data/cache/evocalrank")
 
     @PostConstruct
     fun initClient() {
+        // 初始化缓存目录
+        if (!cacheDir.exists()) {
+            cacheDir.mkdirs()
+        }
+
         client = HttpClient(CIO) {
             install(HttpTimeout) {
                 requestTimeoutMillis = 30_000
@@ -193,7 +197,56 @@ class EVocalRankUtils {
     suspend fun getLatestRank(): VideoData {
         val response: HttpResponse = client.get("https://www.evocalrank.com/data/info/latest.json")
         val responseBody = response.bodyAsText()
-        return Json { ignoreUnknownKeys = true }.decodeFromString<VideoData>(responseBody)
+        val json = Json { ignoreUnknownKeys = true }
+        val videoData = json.decodeFromString<VideoData>(responseBody)
+
+        val jsonCacheFile = File(cacheDir, "${videoData.ranknum}.json")
+        if (!jsonCacheFile.exists()) {
+            logger().info("正在缓存第 ${videoData.ranknum} 期 JSON 数据")
+            jsonCacheFile.writeText(responseBody)
+        }
+        return videoData
+    }
+
+    suspend fun getImage(fileName: String, url: String): ByteArray? {
+        val cacheFile = File(cacheDir, fileName)
+
+        if (cacheFile.exists()) {
+            logger().info("命中本地缓存: $fileName")
+            return cacheFile.readBytes()
+        }
+
+        logger().info("缓存未命中，开始下载: $url -> $fileName")
+        ImageParser.disableBase64UploadWarn()
+
+        return try {
+            val response: HttpResponse = client.get(url)
+            if (response.status.value == 200) {
+                val bytes = response.readBytes()
+                cacheFile.writeBytes(bytes)
+                bytes
+            } else {
+                logger().error("下载失败: HTTP ${response.status.value}")
+                null
+            }
+        } catch (e: Exception) {
+            logger().error("下载图片异常: ${e.message}")
+            null
+        }
+    }
+
+    fun clearCache(): Boolean {
+        return try {
+            if (cacheDir.exists()) {
+                cacheDir.deleteRecursively()
+                cacheDir.mkdirs()
+                logger().info("已清空 evocalrank 缓存目录")
+                true
+            } else false
+        } catch (e: Exception) {
+            logger().error("清空缓存失败: ${e.message}")
+            false
+        }
     }
 
     @PreDestroy
@@ -202,29 +255,4 @@ class EVocalRankUtils {
             client.close()
         }
     }
-
-    suspend fun getImage(av: String, url: String): ByteArray? {
-        val client = OkHttpClient()
-        logger().info("尝试为 $av 获取封面 $url")
-
-        ImageParser.disableBase64UploadWarn()
-
-        val request = Request.Builder().url(url).header(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"
-        ).build()
-
-        return try {
-            val response = client.newCall(request).execute()
-            if (response.isSuccessful) {
-                response.body?.bytes()
-            } else {
-                null
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-            null
-        }
-    }
-
 }
