@@ -7,6 +7,10 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -55,6 +59,7 @@ data class VideoData(
     val collect_start_time_timestamp: Long,
     val collect_end_time_timestamp: Long,
     val main_rank: List<MainRankItem>,
+    val second_rank: List<MainRankItem>,
 //    val history_10_year: List<HistoryItem>,
 //    val ed: List<EdItem>,
 //    val op: List<OpItem>,
@@ -173,6 +178,8 @@ class EVocalRankUtils {
     private lateinit var client: HttpClient
     private val cacheDir = File("data/cache/evocalrank")
 
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     @PostConstruct
     fun initClient() {
         // 初始化缓存目录
@@ -202,8 +209,14 @@ class EVocalRankUtils {
 
         val jsonCacheFile = File(cacheDir, "${videoData.ranknum}.json")
         if (!jsonCacheFile.exists()) {
-            logger().info("正在缓存第 ${videoData.ranknum} 期 JSON 数据")
-            jsonCacheFile.writeText(responseBody)
+            serviceScope.launch {
+                try {
+                    logger().info("正在后台缓存第 ${videoData.ranknum} 期 JSON")
+                    jsonCacheFile.writeText(responseBody)
+                } catch (e: Exception) {
+                    logger().error("JSON 缓存失败: ${e.message}")
+                }
+            }
         }
         return videoData
     }
@@ -223,14 +236,19 @@ class EVocalRankUtils {
             val response: HttpResponse = client.get(url)
             if (response.status.value == 200) {
                 val bytes = response.readBytes()
-                cacheFile.writeBytes(bytes)
+                serviceScope.launch {
+                    try {
+                        cacheFile.writeBytes(bytes)
+                        logger().info("图片缓存保存成功: $fileName")
+                    } catch (e: Exception) {
+                        logger().error("图片写入磁盘失败: ${e.message}")
+                    }
+                }
                 bytes
             } else {
-                logger().error("下载失败: HTTP ${response.status.value}")
                 null
             }
         } catch (e: Exception) {
-            logger().error("下载图片异常: ${e.message}")
             null
         }
     }

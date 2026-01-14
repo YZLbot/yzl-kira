@@ -22,8 +22,8 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
         println(event.messageContent.plainText?.trim()?.removePrefix("/中V周刊"))
         val requestRank = event.messageContent.plainText?.trim()?.removePrefix("/中V周刊")?.trim()?.toIntOrNull()
         if (requestRank != null) {
-            if (requestRank !in 1..30) {
-                event.content().send("\n你查询的曲子超出了主榜范围(1~30)！".toText())
+            if (requestRank !in 1..110) {
+                event.content().send("\n你查询的曲子超出了范围(1~110)！".toText())
                 return
             }
             event.content().send("加载中……".toText())
@@ -34,7 +34,9 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
                 e.printStackTrace()
                 return
             }
-            val requestData = latestData.main_rank[requestRank - 1]
+            val requestData = if (requestRank <= 30)
+                latestData.main_rank[requestRank - 1] else
+                latestData.second_rank[requestRank - 30 - 1]
             val returnStr = "#${requestRank} ${requestData.avid}\n" +
                     "${requestData.title}\n" +
                     "得分: ${requestData.point}\n" +
