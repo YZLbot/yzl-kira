@@ -23,14 +23,10 @@ class JsonLoaderService(private val externalConfigManager: ExternalConfigManager
 
     @PostConstruct
     fun loadJsonFile() {
-//        val resource = ClassPathResource("divination.json")
         divinationJsonString = externalConfigManager.readFileContent("config/divination.json")!!
         lyricsJsonString = externalConfigManager.readFileContent("config/lyrics.json")!!
-        wordleJsonString = externalConfigManager.readFileContent("config/words.json")!!
         divinationJsonElement = Json.parseToJsonElement(divinationJsonString)
-        wordleJsonElement = Json.parseToJsonElement(wordleJsonString)
 
         logger().info("抽签 JSON 文件加载完成，共 ${divinationJsonElement.jsonObject.size} 条~")
-        logger().info("单词加载完成，共 ${wordleJsonElement.jsonObject.size} 条~")
     }
 }

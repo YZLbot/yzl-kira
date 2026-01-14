@@ -1,5 +1,7 @@
 package top.tbpdt.utils
 
+import kotlinx.serialization.json.jsonObject
+import top.tbpdt.handle.Wordle
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.Font
@@ -9,16 +11,42 @@ import java.io.File
 import javax.imageio.ImageIO
 
 enum class GuessResult {
-    WIN, // 猜出正确单词
-    LOSS, // 达到最大可猜次数，未猜出正确单词
-    DUPLICATE, // 单词重复
-    ILLEGAL // 单词不合法
+    /**
+     * 猜出正确单词
+     */
+    WIN,
+
+    /**
+     * 达到最大可猜次数，未猜出正确单词
+     */
+    LOSS,
+
+    /**
+     * 单词重复
+     */
+    DUPLICATE,
+
+    /**
+     * 单词不合法
+     */
+    ILLEGAL,
+
+    /**
+     * 没有出现在词库中的单词
+     */
+    UNKNOWN,
 }
 
 /**
  * @author Takeoff0518
  */
-class WordleRound(val word: String, val chineseMeaning: String, val englishMeaning: String) {
+class WordleRound(
+    val wordle: Wordle,
+    val groupId: String,
+    val word: String,
+    val chineseMeaning: String,
+    val englishMeaning: String
+) {
     // 文字块尺寸
     val blockSize = Dimension(40, 40)
 
@@ -79,6 +107,7 @@ class WordleRound(val word: String, val chineseMeaning: String, val englishMeani
                 GuessResult.WIN
             }
 
+            !isWordExistsInDict(lowerWord) -> GuessResult.UNKNOWN
             lowerWord in guessedWords -> GuessResult.DUPLICATE
             !legalWord(lowerWord) -> GuessResult.ILLEGAL
             else -> {
@@ -242,5 +271,11 @@ class WordleRound(val word: String, val chineseMeaning: String, val englishMeani
     // 实现单词合法性检查
     private fun legalWord(word: String): Boolean {
         return word.length == length && word.all { it in 'a'..'z' }
+    }
+
+    // 检查所猜的词是否在词库中
+    private fun isWordExistsInDict(word: String): Boolean {
+        val currentDict = wordle.dictJsonElements[wordle.getdictId(groupId)].jsonObject
+        return currentDict.containsKey(word)
     }
 }
