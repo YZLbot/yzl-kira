@@ -37,16 +37,16 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
             val requestData = if (requestRank <= 30)
                 latestData.main_rank[requestRank - 1] else
                 latestData.second_rank[requestRank - 30 - 1]
-            val returnStr = "#${requestRank} ${avToBV(requestData.avid)}\n" +
-                    "${requestData.title}\n" +
-                    "得分: ${requestData.point}\n" +
-                    "发布日期: ${requestData.pubdate}\n" +
-                    "播放: ${requestData.play}\n" +
-                    "评论: ${requestData.comment}\n" +
-                    "弹幕: ${requestData.danmaku}\n" +
-                    "点赞：${requestData.like}\n" +
-                    "收藏: ${requestData.favorite}\n" +
-                    "硬币: ${requestData.coin}"
+            val returnStr = "[${requestRank}]${requestData.title}\n" +
+                    "(${avToBV(requestData.avid)})\n" +
+                    "\uD83D\uDD25得分: ${requestData.point}\n" +
+                    "\uD83D\uDCC5发布日期: ${requestData.pubdate.drop(5).dropLast(3)}\n" +
+                    "\u25B6\uFE0F播放: ${requestData.play}\n" +
+                    "\uD83D\uDCAC评论: ${requestData.comment}\n" +
+                    "\uD83D\uDE80弹幕: ${requestData.danmaku}\n" +
+                    "\uD83D\uDC4D点赞: ${requestData.like}\n" +
+                    "\u2B50收藏: ${requestData.favorite}\n" +
+                    "\uD83E\uDE99硬币: ${requestData.coin}"
 //                    requestData.url + "\n"
             val image = eVocalRankUtils.getImage(requestData.avid, requestData.coverurl)?.toOfflineImage()
             if (image == null) {
