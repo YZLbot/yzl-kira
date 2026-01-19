@@ -37,7 +37,7 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
             val requestData = if (requestRank <= 30)
                 latestData.main_rank[requestRank - 1] else
                 latestData.second_rank[requestRank - 30 - 1]
-            val returnStr = "#${requestRank} ${requestData.avid}\n" +
+            val returnStr = "#${requestRank} ${avToBV(requestData.avid)}\n" +
                     "${requestData.title}\n" +
                     "得分: ${requestData.point}\n" +
                     "发布日期: ${requestData.pubdate}\n" +
@@ -50,7 +50,7 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
 //                    requestData.url + "\n"
             val image = eVocalRankUtils.getImage(requestData.avid, requestData.coverurl)?.toOfflineImage()
             if (image == null) {
-                event.content().send("[视频封面获取失败]\n$returnStr".toText())
+                event.content().send("\n$returnStr".toText())
             } else {
                 event.content()
                     .send("\n".toText() + returnStr.toText() + image)
@@ -64,26 +64,53 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
         event.content().send("加载中……".toText())
 
         val latestData = try {
-            eVocalRankUtils.getLatestRank()
+            eVocalRankUtils.getLatestRank(true)
         } catch (e: Exception) {
             event.content().send("\n意外失去了与母星的联系……\n${e.message}".toText())
             e.printStackTrace()
             return
         }
-        val image = eVocalRankUtils.getImage("mainCover", latestData.coverurl)?.toOfflineImage()
+        val image = eVocalRankUtils.getImage("${latestData.ranknum}", latestData.coverurl)?.toOfflineImage()
         val overviewStr = "\n周刊虚拟歌手中文曲排行榜♪${latestData.ranknum}\n" +
                 "总计收录: ${latestData.statistic.total_collect_count}首\n" +
                 "新曲数: ${latestData.statistic.new_video_count}首\n" +
                 "新曲入榜数: ${latestData.statistic.new_in_rank_count}首\n" +
                 "新曲入主榜数: ${latestData.statistic.new_in_mainrank_count}首\n" +
                 "最后收录时间: ${latestData.collect_end_time}\n" +
-                "发送 .vcrank [排名(1~30)] 以获取主榜详细信息~"
+                "发送 .vcrank [排名(1~110)] 以获取单个稿件的详细信息~"
         println("尝试发送消息！")
-        event.content().send(overviewStr.toText() + (image ?: "[视频封面获取失败]".toText()))
+        event.content().send(overviewStr.toText() + (image ?: "".toText()))
         val builder = StringBuilder().append("\n")
         for (i in latestData.main_rank) {
             builder.append("[${i.rank}]${i.title}\n")
         }
         event.content().send(builder.toString().toText())
+    }
+
+    fun avToBV(avId: String): String {
+        val XOR_CODE = 23442827791579L
+        val MAX_AID = 1L shl 51 //  2^51
+        val DATA = "FcwAPNKTMug3GV5Lj7EJnHpWsx4tb8haYeviqBz6rkCy12mUSDQX9RdoZf"
+        val BASE = 58
+
+        val aid = avId.substring(2).toLong()
+        val bytes = "BV1000000000".toCharArray()
+        var tmp = (MAX_AID or aid) xor XOR_CODE
+
+        var bvIdx = bytes.size - 1
+        while (tmp > 0) {
+            bytes[bvIdx] = DATA[(tmp % BASE).toInt()]
+            tmp /= BASE
+            bvIdx--
+        }
+        fun swap(i: Int, j: Int) {
+            val t = bytes[i]
+            bytes[i] = bytes[j]
+            bytes[j] = t
+        }
+        swap(3, 9)
+        swap(4, 7)
+
+        return String(bytes)
     }
 }

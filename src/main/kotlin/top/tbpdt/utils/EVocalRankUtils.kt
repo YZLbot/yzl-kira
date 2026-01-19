@@ -5,12 +5,12 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.HttpHeaders
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -19,10 +19,15 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
-import love.forte.simbot.component.qguild.message.ImageParser
 import org.springframework.stereotype.Service
 import top.tbpdt.logger
 import java.io.File
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
+
 
 object PubDateSerializer : KSerializer<String> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("PubDate", PrimitiveKind.STRING)
@@ -175,8 +180,17 @@ data class Diff(
  */
 @Service
 class EVocalRankUtils {
+    private val ORIGIN_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    private val ORIGIN_DATE_TIME = LocalDateTime.parse("2026-01-18 08:00:00", ORIGIN_FORMATTER)
+    private val ORIGIN_ISSUE_NUMBER = 702
+
     private lateinit var client: HttpClient
     private val cacheDir = File("data/cache/evocalrank")
+
+    // 并发安全
+    private val imageLoadingTasks = ConcurrentHashMap<String, Deferred<ByteArray?>>()
+    private val rankLoadingTasks = ConcurrentHashMap<String, Deferred<VideoData>>()
+    private val jsonParser = Json { ignoreUnknownKeys = true }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -193,62 +207,148 @@ class EVocalRankUtils {
                 connectTimeoutMillis = 15_000
             }
             defaultRequest {
-                header(
-                    "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"
-                )
+                url("https://s3-cdn.evocalrank.com/")
+
+                header(HttpHeaders.UserAgent, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0")
+
+                header("sec-ch-ua", "\"Microsoft Edge\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\"")
+                header("sec-ch-ua-mobile", "?0")
+                header("sec-ch-ua-platform", "\"Windows\"")
+
+                header("Sec-Fetch-Dest", "document")
+                header("Sec-Fetch-Mode", "navigate")
+                header("Sec-Fetch-Site", "same-origin")
+                header("Sec-Fetch-User", "?1")
+
+                header(HttpHeaders.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+                header(HttpHeaders.AcceptEncoding, "gzip, deflate, br, zstd")
+                header(HttpHeaders.AcceptLanguage, "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6")
+
+                header("Upgrade-Insecure-Requests", "1")
+                header(HttpHeaders.Connection, "keep-alive")
             }
         }
     }
 
-    suspend fun getLatestRank(): VideoData {
-        val response: HttpResponse = client.get("https://www.evocalrank.com/data/info/latest.json")
-        val responseBody = response.bodyAsText()
-        val json = Json { ignoreUnknownKeys = true }
-        val videoData = json.decodeFromString<VideoData>(responseBody)
+    fun getIssueNow(): Int {
+        val now = LocalDateTime.now(ZoneId.of("Asia/Shanghai")) // CST
+        val weeksSince = ChronoUnit.WEEKS.between(ORIGIN_DATE_TIME, now)
+        return ORIGIN_ISSUE_NUMBER + weeksSince.toInt()
+    }
 
-        val jsonCacheFile = File(cacheDir, "${videoData.ranknum}.json")
-        if (!jsonCacheFile.exists()) {
-            serviceScope.launch {
+    suspend fun getLatestRank(isFetchAll: Boolean = false): VideoData {
+        val issueNow = getIssueNow().toString()
+        val jsonCacheFile = File(cacheDir, "${issueNow}.json")
+
+        val cachedData = withContext(Dispatchers.IO) {
+            if (jsonCacheFile.exists()) {
                 try {
-                    logger().info("正在后台缓存第 ${videoData.ranknum} 期 JSON")
-                    jsonCacheFile.writeText(responseBody)
+                    logger().info("命中本地缓存: ${issueNow}.json")
+                    jsonParser.decodeFromString<VideoData>(jsonCacheFile.readText())
                 } catch (e: Exception) {
-                    logger().error("JSON 缓存失败: ${e.message}")
+                    logger().error("缓存解析失败，准备重新下载: ${e.message}")
+                    null
+                }
+            } else null
+        }
+
+        val videoData = if (cachedData != null) {
+            cachedData
+        } else {
+
+            val deferred = synchronized(rankLoadingTasks) {
+                rankLoadingTasks.getOrPut(issueNow) {
+                    CoroutineScope(Dispatchers.IO).async {
+                        fetchAndCacheRank(issueNow, jsonCacheFile)
+                    }
                 }
             }
+            deferred.await()
         }
+
+        if(isFetchAll) {
+            serviceScope.launch {
+                cacheAll(videoData)
+            }
+        }
+
         return videoData
     }
 
-    suspend fun getImage(fileName: String, url: String): ByteArray? {
-        val cacheFile = File(cacheDir, fileName)
 
-        if (cacheFile.exists()) {
-            logger().info("命中本地缓存: $fileName")
-            return cacheFile.readBytes()
+    suspend fun getImage(fileName: String, url: String): ByteArray? {
+        val fixedFileName = if (fileName.endsWith(".jpg", ignoreCase = true)) fileName else "$fileName.jpg"
+        val cacheFile = File(cacheDir, fixedFileName)
+
+        val cachedData = withContext(Dispatchers.IO) {
+            if (cacheFile.exists()) cacheFile.readBytes() else null
+        }
+        if (cachedData != null) {
+            logger().info("命中本地缓存: $fixedFileName")
+            return cachedData
         }
 
-        logger().info("缓存未命中，开始下载: $url -> $fileName")
-        ImageParser.disableBase64UploadWarn()
-
-        return try {
-            val response: HttpResponse = client.get(url)
-            if (response.status.value == 200) {
-                val bytes = response.readBytes()
-                serviceScope.launch {
+        // 请求合并
+        val deferred = synchronized(imageLoadingTasks) {
+            imageLoadingTasks.getOrPut(url) {
+                CoroutineScope(Dispatchers.IO).async {
                     try {
-                        cacheFile.writeBytes(bytes)
-                        logger().info("图片缓存保存成功: $fileName")
-                    } catch (e: Exception) {
-                        logger().error("图片写入磁盘失败: ${e.message}")
+                        performDownload(fixedFileName, url, cacheFile)
+                    } finally {
+                        imageLoadingTasks.remove(url)
                     }
                 }
-                bytes
-            } else {
-                null
             }
+        }
+
+        return deferred.await()
+    }
+
+    private suspend fun fetchAndCacheRank(issueNow: String, cacheFile: File): VideoData {
+        logger().info("开始获取并缓存第 $issueNow 期数据")
+        val url = "https://www.evocalrank.com/data/rank_data/$issueNow.json"
+
+        val response: HttpResponse = client.get(url)
+        val responseBody = response.bodyAsText()
+
+        val videoData = jsonParser.decodeFromString<VideoData>(responseBody)
+
+        withContext(Dispatchers.IO) {
+            val tempFile = File(cacheDir, "${issueNow}_${System.currentTimeMillis()}.json.tmp")
+            try {
+                tempFile.writeText(responseBody)
+                tempFile.renameTo(cacheFile)
+            } catch (e: Exception) {
+                logger().error("JSON 写入磁盘失败: ${e.message}")
+            }
+        }
+
+        return videoData
+    }
+
+    private suspend fun performDownload(fileName: String, url: String, cacheFile: File): ByteArray? {
+        return try {
+            logger().info("开始下载: $url")
+            val response: HttpResponse = client.get(url)
+            if (response.status.value != 200) return null
+
+            val bytes = response.readBytes()
+
+            // 写入文件
+            val tempFile = File(cacheDir, "${fileName}_${System.nanoTime()}.tmp")
+            try {
+                tempFile.writeBytes(bytes)
+                if (!tempFile.renameTo(cacheFile)) {
+                    logger().error("重命名失败: $fileName")
+                }
+            } catch (e: Exception) {
+                logger().error("磁盘写入失败: ${e.message}")
+                if (tempFile.exists()) tempFile.delete()
+            }
+
+            bytes
         } catch (e: Exception) {
+            logger().error("下载异常: ${e.message}")
             null
         }
     }
@@ -265,6 +365,29 @@ class EVocalRankUtils {
             logger().error("清空缓存失败: ${e.message}")
             false
         }
+    }
+
+    suspend fun cacheAll(videoData: VideoData) {
+        val allItems = videoData.main_rank.map { "第 ${it.rank} 名" to it } +
+                videoData.second_rank.map { "第 ${it.rank + 30} 名" to it }
+
+        logger().info("开始后台预缓存，共 ${allItems.size} 张图片")
+
+        coroutineScope {
+            val semaphore = Semaphore(3)
+            allItems.forEach { (label, item) ->
+                launch(Dispatchers.IO) {
+                    semaphore.withPermit {
+                        try {
+                            getImage(item.avid, item.coverurl)
+                        } catch (e: Exception) {
+                            logger().error("预缓存 $label 图片失败: ${item.avid}")
+                        }
+                    }
+                }
+            }
+        }
+        logger().info("所有预缓存任务已提交")
     }
 
     @PreDestroy
