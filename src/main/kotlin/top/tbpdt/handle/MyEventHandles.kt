@@ -1,6 +1,5 @@
 package top.tbpdt.handle
 
-import kotlinx.coroutines.delay
 import love.forte.simbot.common.PriorityConstant
 import love.forte.simbot.event.ChatGroupMessageEvent
 import love.forte.simbot.event.Event
@@ -24,40 +23,21 @@ class MyEventHandles {
      * @param event 你要监听的事件的类型。
      * 必须是一个 [Event] 类型的子类
      */
-    @Listener
-    fun handleAllAndPrint(event: Event) {
-        if (event::class.simpleName == "QGGroupSendSupportPostSendEventImpl") {
-            logger().info("发送了信息！")
-        }
-    }
 
-    @Listener(priority = PriorityConstant.PRIORITIZE_9)
-    suspend fun handleMessageEvent(event: ChatGroupMessageEvent) {
-        logger().info("[${event.content().name}(${event.content().id})] ${event.author().name}(${event.author().id}) -> ${event.messageContent.messages}")
-    }
 
     @Listener
     @ContentTrim
-    @Filter("^/test$")
+    @Filter("^/测试$")
     suspend fun handleHelloMessageEvent(event: ChatGroupMessageEvent) {
         event.content().send(
-            ("\n\n" +
+            (
                     listOf(
-                        "alive",
                         "200 OK",
-                        "418 I'm a teapot",
-                        "我已出舱，感觉良好~",
-                        "Hello World!",
-                        "摸鱼ing...",
-                        "QTH INTERNET 73.",
-                        "5X9 73.",
-                        "FB UR 5NN PSE K.",
-                        "online"
+                        "我在~",
+                        "阿绫~阿绫~"
                     ).random()
                     )
         )
-        delay((100L..1000L).random())
-        event.content().send("\n\n我在~")
     }
 
 }

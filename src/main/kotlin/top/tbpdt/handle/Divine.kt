@@ -23,8 +23,8 @@ class Divine(private val jsonLoaderService: JsonLoaderService) {
     suspend fun handleDraw(event: ChatGroupMessageEvent) {
         val randoms = (1..384).random()
         val divContent = jsonLoaderService.divinationJsonElement.jsonObject["$randoms"]?.jsonObject?.get("shi").toString().replace("\"", "")
-        val divResult = "\n\n[第 $randoms 签]\n\n$divContent"
-        event.reply(divResult)
+        val divResult = "\n\n[第 $randoms 签]\n\n$divContent\n\n发送 “@我 /解签” 获取这一签的解签~"
+        event.content().send(divResult)
         userCache[event.authorId.toString()] = randoms
     }
 
@@ -33,13 +33,13 @@ class Divine(private val jsonLoaderService: JsonLoaderService) {
     @Filter("^/解签$")
     suspend fun handleInterpret(event: ChatGroupMessageEvent) {
         if (!userCache.containsKey(event.authorId.toString())) {
-            event.reply("请先抽签再来解签哦~")
+            event.content().send("请先抽签再来解签哦~")
             return
         }
         val randoms = userCache[event.authorId.toString()] ?: 0
 
         if (randoms == 0) {
-            event.reply("唔姆，似乎出了点问题诶……再尝试一下抽签吧~")
+            event.content().send("唔姆，似乎出了点问题诶……再尝试一下抽签吧~")
             return
         }
 
@@ -47,7 +47,7 @@ class Divine(private val jsonLoaderService: JsonLoaderService) {
             jsonLoaderService.divinationJsonElement.jsonObject["$randoms"]?.jsonObject?.get("jie").toString().replace("\"", "")
         val divResult = "\n\n[第 $randoms 签: 解签]\n\n$divContent"
 
-        event.reply(divResult)
+        event.content().send(divResult)
     }
 
 }

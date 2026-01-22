@@ -101,7 +101,7 @@ class Wordle(
 
         // 不提示却触发了这个功能
         if (getGroupId(event) in groupCache.keys && argument.isNullOrEmpty()) {
-            event.reply("本群已经开始了一个猜单词游戏哦，请发送“@我 单词”进行猜词~")
+            event.content().send("本群已经开始了一个猜单词游戏哦，请发送“@我 单词”进行猜词~")
             return
         }
 
@@ -164,7 +164,7 @@ class Wordle(
         val wordLength = argument?.removePrefix("/猜单词")?.trim()?.toIntOrNull() ?: (5..6).random()
         val word = getRandomWordByLength(wordLength, getGroupIdStr(event))
         if (word == null) {
-            event.reply("没有找到长度为 $wordLength 的单词呢……")
+            event.content().send("没有找到长度为 $wordLength 的单词呢……")
             return
         }
         groupCache[getGroupId(event)] =
@@ -172,7 +172,9 @@ class Wordle(
         val image = groupCache[getGroupId(event)]?.draw()?.toOfflineImage()
         event.content().send(
             (image
-                ?: "[图片生成失败]".toText()) + "\n猜单词开始！词库：${dictNames[getdictId(getGroupIdStr(event))]}\n发送“@我 /猜单词 hint”可获取提示（仅可用一次）\n发送“@我 /猜单词 exit”结束猜词".toText()
+                ?: "[图片生成失败]".toText()) + ("\n猜单词开始！词库：${dictNames[getdictId(getGroupIdStr(event))]}\n" +
+                    "发送“@我 /猜单词 hint”可获取提示（仅可用一次）\n" +
+                    "发送“@我 /猜单词 exit”结束猜词").toText()
         )
     }
 
