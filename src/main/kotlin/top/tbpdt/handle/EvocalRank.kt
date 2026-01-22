@@ -26,7 +26,7 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
                 event.content().send("\n你查询的曲子超出了范围(1~110)！".toText())
                 return
             }
-            event.content().send("加载中……".toText())
+//            event.content().send("加载中……".toText())
             val latestData = try {
                 eVocalRankUtils.getLatestRank()
             } catch (e: Exception) {
@@ -61,7 +61,7 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
             return
         }
 
-        event.content().send("加载中……".toText())
+//        event.content().send("加载中……".toText())
 
         val latestData = try {
             eVocalRankUtils.getLatestRank(true)
@@ -77,7 +77,7 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
                 "新曲入榜数: ${latestData.statistic.new_in_rank_count}首\n" +
                 "新曲入主榜数: ${latestData.statistic.new_in_mainrank_count}首\n" +
                 "最后收录时间: ${latestData.collect_end_time}\n" +
-                "发送 .vcrank [排名(1~110)] 以获取单个稿件的详细信息~"
+                "发送 “@我 /中V周刊 [排名(1~110)]” 以获取单个稿件的详细信息~"
         println("尝试发送消息！")
         event.content().send(overviewStr.toText() + (image ?: "".toText()))
         val builder = StringBuilder().append("\n")
