@@ -6,7 +6,7 @@ logging:
     name: logs/myapp.log
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} %-5level: %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36}: %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} %-5level: %msg%n"
 
 simbot:
   # simbot.application: 与 Application 相关的配置
