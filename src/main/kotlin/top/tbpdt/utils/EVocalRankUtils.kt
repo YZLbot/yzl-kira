@@ -239,9 +239,10 @@ class EVocalRankUtils {
     suspend fun getLatestRank(isFetchAll: Boolean = false): VideoData {
         val issueNow = getIssueNow().toString()
         val jsonCacheFile = File(cacheDir, "${issueNow}.json")
+        val isJsonCacheFileExists = jsonCacheFile.exists()
 
         val cachedData = withContext(Dispatchers.IO) {
-            if (jsonCacheFile.exists()) {
+            if (isJsonCacheFileExists) {
                 try {
                     logger().info("命中本地缓存: ${issueNow}.json")
                     jsonParser.decodeFromString<VideoData>(jsonCacheFile.readText())
@@ -266,7 +267,7 @@ class EVocalRankUtils {
             deferred.await()
         }
 
-        if(isFetchAll) {
+        if(isFetchAll && !isJsonCacheFileExists) {
             serviceScope.launch {
                 cacheAll(videoData)
             }
