@@ -1,13 +1,12 @@
 package top.tbpdt.handle
 
-import love.forte.simbot.common.PriorityConstant
+import love.forte.simbot.component.qguild.event.QGC2CMessageCreateEvent
 import love.forte.simbot.event.ChatGroupMessageEvent
 import love.forte.simbot.event.Event
 import love.forte.simbot.quantcat.common.annotations.ContentTrim
 import love.forte.simbot.quantcat.common.annotations.Filter
 import love.forte.simbot.quantcat.common.annotations.Listener
 import org.springframework.stereotype.Component
-import top.tbpdt.logger
 
 /**
  * 一个用于承载监听函数的事件处理器类。
@@ -35,9 +34,13 @@ class MyEventHandles {
                         "200 OK",
                         "我在~",
                         "阿绫~阿绫~"
-                    ).random()
+                    ).random() + "\n欢迎加群以获取最新动态：758502512"
                     )
         )
     }
 
+    @Listener
+    suspend fun handleFriendMessageEvent(event: QGC2CMessageCreateEvent) {
+        event.reply("阿绫暂不支持私聊使用，请在群里和我玩吧~\n欢迎加群以获取最新动态：758502512")
+    }
 }

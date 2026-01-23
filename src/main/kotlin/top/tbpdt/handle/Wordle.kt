@@ -160,8 +160,14 @@ class Wordle(
             return
         }
 
+        if (argument != null && argument.trim().isNotEmpty()) {
+            event.content().send("没有解析到命令……\n" +
+                    "如果正在猜单词，请发送“@我 ${argument.trim()}”参与猜单词~")
+            return
+        }
+
         // 开始
-        val wordLength = argument?.removePrefix("/猜单词")?.trim()?.toIntOrNull() ?: (5..6).random()
+        val wordLength = argument?.removePrefix("/猜单词")?.trim()?.toIntOrNull() ?: (4..7).random()
         val word = getRandomWordByLength(wordLength, getGroupIdStr(event))
         if (word == null) {
             event.content().send("没有找到长度为 $wordLength 的单词呢……")
@@ -172,7 +178,9 @@ class Wordle(
         val image = groupCache[getGroupId(event)]?.draw()?.toOfflineImage()
         event.content().send(
             (image
-                ?: "[图片生成失败]".toText()) + ("\n猜单词开始！词库：${dictNames[getdictId(getGroupIdStr(event))]}\n" +
+                ?: "[图片生成失败]".toText()) + ("\n猜单词开始！\n" +
+                    "词库：${dictNames[getdictId(getGroupIdStr(event))]}\n" +
+                    "发送“@我 [单词]”参与猜单词\n"+
                     "发送“@我 /猜单词 hint”可获取提示（仅可用一次）\n" +
                     "发送“@我 /猜单词 exit”结束猜词").toText()
         )
