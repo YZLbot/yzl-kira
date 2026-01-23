@@ -2,6 +2,10 @@ package top.tbpdt.handle
 
 import love.forte.simbot.common.PriorityConstant
 import love.forte.simbot.common.id.ID
+import love.forte.simbot.component.qguild.event.QGC2CMessageCreateEvent
+import love.forte.simbot.component.qguild.event.QGC2CMessageCreateEventPostReplyEvent
+import love.forte.simbot.component.qguild.event.QGGroupAddRobotEvent
+import love.forte.simbot.component.qguild.event.QGGroupDelRobotEvent
 import love.forte.simbot.component.qguild.event.QGGroupSendSupportPostSendEvent
 import love.forte.simbot.event.ChatGroupMessageEvent
 import love.forte.simbot.event.InteractionMessage
@@ -57,15 +61,44 @@ class SimpleEventLogger {
         }
     }
 
+    // 群消息接收
     @Listener(priority = PriorityConstant.PRIORITIZE_9)
-    suspend fun onBotReceive(event: ChatGroupMessageEvent) {
+    suspend fun onBotGroupReceive(event: ChatGroupMessageEvent) {
         val content = event.messageContent.messages.toLogString()
-        logger().info("[群 (${event.content().id.shortHash()})] ${event.author().nick}(${event.author().id.shortHash()}) -> $content")
+        logger().info("[群 ${event.content().id.shortHash()}] ${event.author().id.shortHash()} -> $content")
     }
 
+    // 群消息发送
     @Listener(priority = PriorityConstant.PRIORITIZE_9)
-    suspend fun onBotSend(event: QGGroupSendSupportPostSendEvent) {
+    suspend fun onBotGroupSend(event: QGGroupSendSupportPostSendEvent) {
         val content = event.message.toLogString()
-        logger().info("[[群 (${event.content.id.shortHash()})] <- $content")
+        logger().info("[群 ${event.content.id.shortHash()}] <- $content")
     }
+
+    // 好友消息接收
+    @Listener(priority = PriorityConstant.PRIORITIZE_9)
+    suspend fun onBotFriendReceive(event: QGC2CMessageCreateEvent) {
+        val content = event.messageContent.messages.toLogString()
+        logger().info("[好友 ${event.authorId.shortHash()}] -> $content")
+    }
+
+    // 好友消息发送
+    @Listener(priority = PriorityConstant.PRIORITIZE_9)
+    suspend fun onBotFriendSend(event: QGC2CMessageCreateEventPostReplyEvent) {
+        val content = event.message.toLogString()
+        logger().info("[好友 ${event.content.content().id.shortHash()}] <- $content")
+    }
+
+    // 加群
+    @Listener(priority = PriorityConstant.PRIORITIZE_9)
+    suspend fun onGroupAddBot(event: QGGroupAddRobotEvent) {
+        logger().info("机器人被 ${event.operator().id.shortHash()} 添加到群聊 ${event.content().id.shortHash()}")
+    }
+
+    // 退群
+    @Listener(priority = PriorityConstant.PRIORITIZE_9)
+    suspend fun onGroupDelBot(event: QGGroupDelRobotEvent) {
+        logger().info("机器人被 ${event.operator().id.shortHash()} 移出群聊 ${event.content().id.shortHash()}")
+    }
+
 }
