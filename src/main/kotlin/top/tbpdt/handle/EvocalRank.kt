@@ -78,7 +78,6 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
                 "新曲入主榜数: ${latestData.statistic.new_in_mainrank_count}首\n" +
                 "最后收录时间: ${latestData.collect_end_time}\n" +
                 "发送 “@我 /中V周刊 [排名(1~110)]” 以获取单个稿件的详细信息~"
-        println("尝试发送消息！")
         event.content().send(overviewStr.toText() + (image ?: "".toText()))
         val builder = StringBuilder().append("\n")
         for (i in latestData.main_rank) {
