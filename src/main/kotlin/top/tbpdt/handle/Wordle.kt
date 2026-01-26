@@ -1,5 +1,8 @@
 package top.tbpdt.handle
 
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import jakarta.annotation.PostConstruct
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -19,6 +22,7 @@ import top.tbpdt.logger
 import top.tbpdt.utils.ExternalConfigManager
 import top.tbpdt.utils.GuessResult.*
 import top.tbpdt.utils.WordleRound
+import java.io.File
 
 data class WordInfo(
     val word: String,
@@ -33,7 +37,13 @@ data class WordInfo(
 class Wordle(
     private val wordleConfiger: WordleConfigManager,
     private val externalConfigManager: ExternalConfigManager,
+    private val objectMapper: ObjectMapper
 ) {
+
+    companion object {
+        private val mapper = jacksonObjectMapper()
+        lateinit var wordsSet: Set<String>
+    }
 
     lateinit var config: WordleConfig
     lateinit var dictJsonElements: MutableList<JsonElement>
@@ -67,6 +77,13 @@ class Wordle(
         }.toMutableList()
 
         logger().info("Wordle 词典加载完毕！共加载 ${dictJsonElements.size} 个词典！")
+
+        val wordsSetData: Map<String, Int> = objectMapper.readValue(
+            File("config/wordleDicts/allWords.json"),
+            object : TypeReference<Map<String, Int>>() {}
+        )
+        wordsSet = wordsSetData.keys.toHashSet()
+        logger().info("单词存在检查表加载完成，共计 ${wordsSet.size} 个单词！")
     }
 
     val groupCache: MutableMap<ID, WordleRound> = mutableMapOf()
@@ -160,9 +177,11 @@ class Wordle(
             return
         }
 
-        if (argument != null && argument.trim().isNotEmpty()) {
-            event.content().send("没有解析到命令……\n" +
-                    "如果正在猜单词，请发送“@我 ${argument.trim()}”参与猜单词~")
+        if (argument?.trim()?.any { !it.isDigit() } == true) {
+            event.content().send(
+                "没有解析到命令……\n" +
+                        "如果正在猜单词，请发送“@我 ${argument.trim()}”参与猜单词~"
+            )
             return
         }
 
@@ -174,13 +193,13 @@ class Wordle(
             return
         }
         groupCache[getGroupId(event)] =
-            WordleRound(this, getGroupIdStr(event), word.word, word.chineseExplanation, word.englishExplanation)
+            WordleRound(getGroupIdStr(event), word.word, word.chineseExplanation, word.englishExplanation)
         val image = groupCache[getGroupId(event)]?.draw()?.toOfflineImage()
         event.content().send(
             (image
                 ?: "[图片生成失败]".toText()) + ("\n猜单词开始！\n" +
                     "词库：${dictNames[getdictId(getGroupIdStr(event))]}\n" +
-                    "发送“@我 [单词]”参与猜单词\n"+
+                    "发送“@我 [单词]”参与猜单词\n" +
                     "发送“@我 /猜单词 hint”可获取提示（仅可用一次）\n" +
                     "发送“@我 /猜单词 exit”结束猜词").toText()
         )

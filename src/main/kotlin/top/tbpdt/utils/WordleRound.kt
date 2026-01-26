@@ -1,6 +1,5 @@
 package top.tbpdt.utils
 
-import kotlinx.serialization.json.jsonObject
 import top.tbpdt.handle.Wordle
 import java.awt.Color
 import java.awt.Dimension
@@ -41,7 +40,6 @@ enum class GuessResult {
  * @author Takeoff0518
  */
 class WordleRound(
-    val wordle: Wordle,
     val groupId: String,
     val word: String,
     val chineseMeaning: String,
@@ -275,7 +273,6 @@ class WordleRound(
 
     // 检查所猜的词是否在词库中
     private fun isWordExistsInDict(word: String): Boolean {
-        val currentDict = wordle.dictJsonElements[wordle.getdictId(groupId)].jsonObject
-        return currentDict.containsKey(word)
+        return Wordle.wordsSet.contains(word)
     }
 }
