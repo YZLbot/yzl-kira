@@ -3,9 +3,11 @@ package top.tbpdt.utils
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
+import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import kotlinx.coroutines.*
@@ -189,7 +191,7 @@ class EVocalRankUtils {
 
     // 并发安全
     private val imageLoadingTasks = ConcurrentHashMap<String, Deferred<ByteArray?>>()
-    private val rankLoadingTasks = ConcurrentHashMap<String, Deferred<VideoData>>()
+    private val rankLoadingTasks = ConcurrentHashMap<Int, Deferred<VideoData>>()
     private val jsonParser = Json { ignoreUnknownKeys = true }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -203,8 +205,12 @@ class EVocalRankUtils {
 
         client = HttpClient(CIO) {
             install(HttpTimeout) {
-                requestTimeoutMillis = 30_000
-                connectTimeoutMillis = 15_000
+                requestTimeoutMillis = 15_0000
+                connectTimeoutMillis = 5_0000
+            }
+            install(ContentEncoding) {
+                deflate()
+                gzip()
             }
             defaultRequest {
                 url("https://s3-cdn.evocalrank.com/")
@@ -221,7 +227,7 @@ class EVocalRankUtils {
                 header("Sec-Fetch-User", "?1")
 
                 header(HttpHeaders.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-                header(HttpHeaders.AcceptEncoding, "gzip, deflate, br, zstd")
+//                header(HttpHeaders.AcceptEncoding, "gzip, deflate, br, zstd")
                 header(HttpHeaders.AcceptLanguage, "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6")
 
                 header("Upgrade-Insecure-Requests", "1")
@@ -233,44 +239,43 @@ class EVocalRankUtils {
     fun getIssueNow(): Int {
         val now = LocalDateTime.now(ZoneId.of("Asia/Shanghai")) // CST
         val weeksSince = ChronoUnit.WEEKS.between(ORIGIN_DATE_TIME, now)
+        logger().info("现在是第 ${ORIGIN_ISSUE_NUMBER + weeksSince.toInt()} 期，时间$now")
         return ORIGIN_ISSUE_NUMBER + weeksSince.toInt()
     }
 
     suspend fun getLatestRank(isFetchAll: Boolean = false): VideoData {
-        val issueNow = getIssueNow().toString()
-        val jsonCacheFile = File(cacheDir, "${issueNow}.json")
-        val isJsonCacheFileExists = jsonCacheFile.exists()
+        val issueNow = getIssueNow()
+        val latestFile = File(cacheDir, "$issueNow.json")
 
-        val cachedData = withContext(Dispatchers.IO) {
-            if (isJsonCacheFileExists) {
-                try {
-                    logger().info("命中本地缓存: ${issueNow}.json")
-                    jsonParser.decodeFromString<VideoData>(jsonCacheFile.readText())
-                } catch (e: Exception) {
-                    logger().error("缓存解析失败，准备重新下载: ${e.message}")
-                    null
+        // 只有命中绝对最新的 issueNow 缓存时才直接返回
+        if (latestFile.exists()) {
+            try {
+                logger().info("命中最新期数本地缓存: ${issueNow}.json")
+                return withContext(Dispatchers.IO) {
+                    jsonParser.decodeFromString<VideoData>(latestFile.readText())
                 }
-            } else null
+            } catch (e: Exception) {
+                logger().error("最新缓存解析失败: ${e.message}")
+            }
         }
 
-        val videoData = if (cachedData != null) {
-            cachedData
-        } else {
-
+        val videoData = try {
             val deferred = synchronized(rankLoadingTasks) {
                 rankLoadingTasks.getOrPut(issueNow) {
-                    CoroutineScope(Dispatchers.IO).async {
-                        fetchAndCacheRank(issueNow, jsonCacheFile)
+                    serviceScope.async {
+                        fetchWithFallback(issueNow)
                     }
                 }
             }
             deferred.await()
+        } finally {
+            synchronized(rankLoadingTasks) {
+                rankLoadingTasks.remove(issueNow)
+            }
         }
 
-        if(isFetchAll && !isJsonCacheFileExists) {
-            serviceScope.launch {
-                cacheAll(videoData)
-            }
+        if (isFetchAll) {
+            serviceScope.launch { cacheAll(videoData) }
         }
 
         return videoData
@@ -305,20 +310,53 @@ class EVocalRankUtils {
         return deferred.await()
     }
 
-    private suspend fun fetchAndCacheRank(issueNow: String, cacheFile: File): VideoData {
-        logger().info("开始获取并缓存第 $issueNow 期数据")
-        val url = "https://www.evocalrank.com/data/rank_data/$issueNow.json"
+    private suspend fun fetchWithFallback(startIssue: Int): VideoData {
+        for (currentIssue in startIssue downTo (startIssue - 5)) {
+            val currentFile = File(cacheDir, "$currentIssue.json")
+
+            // 检查这一期本地是否有缓存
+            if (currentFile.exists()) {
+                try {
+                    return withContext(Dispatchers.IO) {
+                        jsonParser.decodeFromString<VideoData>(currentFile.readText())
+                    }
+                } catch (_: Exception) {
+                    // 如果本地文件损坏，则继续走网络请求覆盖它
+                }
+            }
+
+            // 没有就去请求
+            val remoteData = tryFetchRank(currentIssue, currentFile)
+            if (remoteData != null) {
+                return remoteData
+            }
+
+            logger().warn("第 $currentIssue 期获取失败，尝试上一期...")
+        }
+
+        throw Exception("尝试了最近 5 期数据，本地及网络均不可用")
+    }
+
+    private suspend fun tryFetchRank(issue: Int, currentCacheFile: File): VideoData? {
+        logger().info("尝试获取并缓存第 $issue 期数据")
+        val url = "https://www.evocalrank.com/data/rank_data/$issue.json"
 
         val response: HttpResponse = client.get(url)
-        val responseBody = response.bodyAsText()
 
+        if (response.status == HttpStatusCode.NotFound) {
+            logger().warn("第 $issue 期不存在 (404)")
+            return null
+        }
+
+        val responseBody = response.bodyAsText()
         val videoData = jsonParser.decodeFromString<VideoData>(responseBody)
 
         withContext(Dispatchers.IO) {
-            val tempFile = File(cacheDir, "${issueNow}_${System.currentTimeMillis()}.json.tmp")
+            val tempFile = File(cacheDir, "${issue}_${System.currentTimeMillis()}.json.tmp")
             try {
                 tempFile.writeText(responseBody)
-                tempFile.renameTo(cacheFile)
+                tempFile.renameTo(currentCacheFile)
+                logger().info("第 $issue 期数据已缓存至 ${currentCacheFile.name}")
             } catch (e: Exception) {
                 logger().error("JSON 写入磁盘失败: ${e.message}")
             }
@@ -328,30 +366,47 @@ class EVocalRankUtils {
     }
 
     private suspend fun performDownload(fileName: String, url: String, cacheFile: File): ByteArray? {
-        return try {
-            logger().info("开始下载: $url")
-            val response: HttpResponse = client.get(url)
-            if (response.status.value != 200) return null
+        val maxAttempts = 3
 
-            val bytes = response.readBytes()
-
-            // 写入文件
-            val tempFile = File(cacheDir, "${fileName}_${System.nanoTime()}.tmp")
+        for (attempt in 1..maxAttempts) {
             try {
-                tempFile.writeBytes(bytes)
-                if (!tempFile.renameTo(cacheFile)) {
-                    logger().error("重命名失败: $fileName")
-                }
-            } catch (e: Exception) {
-                logger().error("磁盘写入失败: ${e.message}")
-                if (tempFile.exists()) tempFile.delete()
-            }
+                logger().info("开始下载 (第 $attempt 次尝试): $url")
+                val response: HttpResponse = client.get(url)
 
-            bytes
-        } catch (e: Exception) {
-            logger().error("下载异常: ${e.message}")
-            null
+                if (response.status.value != HttpStatusCode.OK.value) {
+                    logger().warn("下载返回非 200 状态: ${response.status.value} (尝试 $attempt/$maxAttempts)")
+                    if (attempt < maxAttempts) {
+                        delay((100L..2000L).random()) // 重试前等待一下
+                        continue
+                    }
+                    return null
+                }
+
+                val bytes = response.readBytes()
+
+                val tempFile = File(cacheDir, "${fileName}_${System.nanoTime()}.tmp")
+                try {
+                    tempFile.writeBytes(bytes)
+                    if (!tempFile.renameTo(cacheFile)) {
+                        logger().error("重命名失败: $fileName")
+                    }
+                } catch (e: Exception) {
+                    logger().error("磁盘写入失败: ${e.message}")
+                    if (tempFile.exists()) tempFile.delete()
+                }
+
+                return bytes
+
+            } catch (e: Exception) {
+                logger().error("第 $attempt 次下载异常: ${e.message}")
+                if (attempt < maxAttempts) {
+                    delay((100L..2000L).random())
+                } else {
+                    logger().error("已达到最大重试次数，下载放弃: $url")
+                }
+            }
         }
+        return null
     }
 
     fun clearCache(): Boolean {

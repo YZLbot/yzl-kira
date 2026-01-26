@@ -26,6 +26,7 @@ dependencies {
     implementation(libs.simbot.component.qq)
     implementation(libs.ktor.client.java)
     implementation(libs.spring.web)
+    implementation("io.ktor:ktor-client-encoding:2.3.12")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.junit.jupiter:junit-jupiter")
     implementation("org.springframework.boot:spring-boot-configuration-processor")
