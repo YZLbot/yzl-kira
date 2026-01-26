@@ -2,11 +2,7 @@ package top.tbpdt.handle
 
 import love.forte.simbot.common.PriorityConstant
 import love.forte.simbot.common.id.ID
-import love.forte.simbot.component.qguild.event.QGC2CMessageCreateEvent
-import love.forte.simbot.component.qguild.event.QGC2CMessageCreateEventPostReplyEvent
-import love.forte.simbot.component.qguild.event.QGGroupAddRobotEvent
-import love.forte.simbot.component.qguild.event.QGGroupDelRobotEvent
-import love.forte.simbot.component.qguild.event.QGGroupSendSupportPostSendEvent
+import love.forte.simbot.component.qguild.event.*
 import love.forte.simbot.event.ChatGroupMessageEvent
 import love.forte.simbot.event.InteractionMessage
 import love.forte.simbot.message.*
@@ -36,7 +32,9 @@ class SimpleEventLogger {
                 this.messageContent.messages.toLogString()
             }
 
-            else -> "[未知交互消息: ${this::class.simpleName}]"
+            is InteractionMessage.Extension -> {
+                "[扩展消息: ${this::class.simpleName}]"
+            }
         }
     }
 
@@ -101,4 +99,15 @@ class SimpleEventLogger {
         logger().info("机器人被 ${event.operator().id.shortHash()} 移出群聊 ${event.content().id.shortHash()}")
     }
 
+    // 加好友
+    @Listener(priority = PriorityConstant.PRIORITIZE_9)
+    suspend fun onFriendAdd(event: QGFriendAddEvent) {
+        logger().info("机器人被 ${event.content().id.shortHash()} 添加到消息列表")
+    }
+
+    // 删好友
+    @Listener(priority = PriorityConstant.PRIORITIZE_9)
+    suspend fun onFriendDel(event: QGFriendDelEvent) {
+        logger().info("机器人被 ${event.content().id.shortHash()} 移出消息列表")
+    }
 }
