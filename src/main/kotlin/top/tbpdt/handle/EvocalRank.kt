@@ -8,6 +8,7 @@ import love.forte.simbot.quantcat.common.annotations.ContentTrim
 import love.forte.simbot.quantcat.common.annotations.Filter
 import love.forte.simbot.quantcat.common.annotations.Listener
 import org.springframework.stereotype.Component
+import top.tbpdt.logger
 import top.tbpdt.utils.EVocalRankUtils
 
 /**
@@ -30,8 +31,7 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
             val latestData = try {
                 eVocalRankUtils.getLatestRank()
             } catch (e: Exception) {
-                event.content().send("\n意外失去了与母星的联系……".toText())
-                e.printStackTrace()
+                event.content().send("\n意外失去了与母星的联系……".toText(), e)
                 return
             }
             val requestData = if (requestRank <= 30)
@@ -67,7 +67,7 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
             eVocalRankUtils.getLatestRank(true)
         } catch (e: Exception) {
             event.content().send("\n意外失去了与母星的联系……\n${e.message}".toText())
-            e.printStackTrace()
+            logger().error("周刊信息获取失败", e)
             return
         }
         val image = eVocalRankUtils.getImage("${latestData.ranknum}", latestData.coverurl)?.toOfflineImage()

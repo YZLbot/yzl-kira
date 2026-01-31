@@ -41,7 +41,7 @@ class RandomLyrics(public val jsonLoaderService: JsonLoaderService) {
             return cachedLyricsList!!
         } catch (e: Exception) {
             cachedLyricsList = null
-            e.printStackTrace()
+            logger().error("歌词加载失败", e)
             throw e
         }
     }

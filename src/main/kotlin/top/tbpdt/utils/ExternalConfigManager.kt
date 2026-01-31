@@ -55,8 +55,7 @@ class ExternalConfigManager {
                 logger().error("JAR内未找到文件: $internalPath")
             }
         } catch (e: Exception) {
-            logger().error("复制文件失败: $internalPath -> ${externalFile.absolutePath}")
-            e.printStackTrace()
+            logger().error("复制文件失败: $internalPath -> ${externalFile.absolutePath}", e)
         }
     }
 
@@ -74,8 +73,7 @@ class ExternalConfigManager {
                 readFromJar(filePath)
             }
         } catch (e: Exception) {
-            logger().error("读取文件失败: $filePath")
-            e.printStackTrace()
+            logger().error("读取文件失败: $filePath", e)
             null
         }
     }
@@ -106,8 +104,7 @@ class ExternalConfigManager {
             externalFile.writeText(content)
             true
         } catch (e: Exception) {
-            logger().error("写入文件失败: $filePath")
-            e.printStackTrace()
+            logger().error("写入文件失败: $filePath", e)
             false
         }
     }
