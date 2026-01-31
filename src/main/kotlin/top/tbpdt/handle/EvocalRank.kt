@@ -31,7 +31,8 @@ class EvocalRank(private val eVocalRankUtils: EVocalRankUtils) {
             val latestData = try {
                 eVocalRankUtils.getLatestRank()
             } catch (e: Exception) {
-                event.content().send("\n意外失去了与母星的联系……".toText(), e)
+                event.content().send("\n意外失去了与母星的联系……".toText())
+                logger().error("周刊获取失败", e)
                 return
             }
             val requestData = if (requestRank <= 30)
