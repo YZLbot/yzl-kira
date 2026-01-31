@@ -64,6 +64,8 @@ class Wordle(
 
     suspend fun getGroupIdStr(event: ChatGroupMessageEvent) = getGroupId(event).toString()
 
+    fun ID.shortHash() = this.toString().take(8).lowercase()
+
     @PostConstruct
     fun configInit() {
         wordleConfiger.initialize()
@@ -128,6 +130,10 @@ class Wordle(
         if (argument != null && argument.trim() == "hint") {
             if (wordleRoundNow.isHinted) {
                 event.content().send("提示机会已经用完了哦，加油~")
+                return
+            }
+            if (!wordleRoundNow.getHint().contains('*')) {
+                event.content().send("唔姆，再提示答案就出来了，阿绫就不告诉你啦，加油~")
                 return
             }
             wordleRoundNow.isHinted = true
@@ -200,10 +206,10 @@ class Wordle(
         }
         wordleRoundNow =
             WordleRound(getGroupIdStr(event), word.word, word.chineseExplanation, word.englishExplanation)
-        val image = wordleRoundNow?.draw()?.toOfflineImage()
+        logger().info("群 ${event.content().id.shortHash()} 开始猜单词 ${word.word}")
+        val image = wordleRoundNow.draw().toOfflineImage()
         event.content().send(
-            (image
-                ?: "[图片生成失败]".toText()) + ("\n猜单词开始！\n" +
+            image + ("\n猜单词开始！\n" +
                     "词库：${dictNames[getdictId(getGroupIdStr(event))]}\n" +
                     "发送“@我 [单词]”参与猜单词\n" +
                     "发送“@我 /猜单词 hint”可获取提示（仅可用一次）\n" +
@@ -244,7 +250,7 @@ class Wordle(
             LOSS -> {
                 event.content().send(image)
                 event.content()
-                    .send("\n".toText() + (wordleRoundNow?.result ?: "释义获取失败！").toText())
+                    .send("\n".toText() + wordleRoundNow.result.toText())
                 groupCache.remove(getGroupId(event))
             }
 
