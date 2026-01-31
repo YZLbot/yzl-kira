@@ -122,25 +122,27 @@ class Wordle(
             return
         }
 
+        var wordleRoundNow = groupCache[getGroupId(event)] ?: return
+
         // 提示
         if (argument != null && argument.trim() == "hint") {
-            if (groupCache[getGroupId(event)]?.isHinted == true) {
+            if (wordleRoundNow.isHinted) {
                 event.content().send("提示机会已经用完了哦，加油~")
                 return
             }
-            groupCache[getGroupId(event)]?.isHinted = true
-            val image = groupCache[getGroupId(event)]?.drawHint()?.toOfflineImage()
-            event.content().send(image ?: "[图片生成失败]".toText())
+            wordleRoundNow.isHinted = true
+            val image = wordleRoundNow.drawHint().toOfflineImage()
+            event.content().send(image)
             return
         }
 
         // 结束
         if (argument != null && argument.trim() == "exit") {
-            groupCache[getGroupId(event)]?.guess(groupCache[getGroupId(event)]!!.word)
-            val image = groupCache[getGroupId(event)]?.draw()?.toOfflineImage()
-            event.content().send(image ?: "[图片生成失败]".toText())
+            wordleRoundNow.guess(wordleRoundNow.word)
+            val image = wordleRoundNow.draw().toOfflineImage()
+            event.content().send(image)
             event.content()
-                .send("游戏终止~\n".toText() + (groupCache[getGroupId(event)]?.result ?: "释义获取失败！").toText())
+                .send("游戏终止~\n".toText() + wordleRoundNow.result.toText())
             groupCache.remove(getGroupId(event))
             return
         }
@@ -196,9 +198,9 @@ class Wordle(
             event.content().send("单词长度太长了，没法猜呢……换个长度试一下？")
             return
         }
-        groupCache[getGroupId(event)] =
+        wordleRoundNow =
             WordleRound(getGroupIdStr(event), word.word, word.chineseExplanation, word.englishExplanation)
-        val image = groupCache[getGroupId(event)]?.draw()?.toOfflineImage()
+        val image = wordleRoundNow?.draw()?.toOfflineImage()
         event.content().send(
             (image
                 ?: "[图片生成失败]".toText()) + ("\n猜单词开始！\n" +
@@ -221,39 +223,42 @@ class Wordle(
         if (guessWord == null || guessWord.isBlank()) {
             return
         }
-        val gameStatus = groupCache[getGroupId(event)]?.guess(guessWord)
-        val image = groupCache[getGroupId(event)]?.draw()?.toOfflineImage()
+
+        val wordleRoundNow = groupCache[getGroupId(event)] ?: return
+
+        val gameStatus = wordleRoundNow.guess(guessWord)
+        val image = wordleRoundNow.draw().toOfflineImage()
         when (gameStatus) {
             DUPLICATE -> {
                 event.content()
-                    .send("你已经猜过这个单词了，再尝试一下别的单词吧~".toText() + (image ?: "[图片生成失败]".toText()))
+                    .send("你已经猜过这个单词了，再尝试一下别的单词吧~".toText() + image)
             }
 
             WIN -> {
-                event.content().send(image ?: "[图片生成失败]".toText())
+                event.content().send(image)
                 event.content()
-                    .send("\n".toText() + (groupCache[getGroupId(event)]?.result ?: "释义获取失败！").toText())
+                    .send("\n".toText() + wordleRoundNow.result.toText())
                 groupCache.remove(getGroupId(event))
             }
 
             LOSS -> {
-                event.content().send(image ?: "[图片生成失败]".toText())
+                event.content().send(image)
                 event.content()
-                    .send("\n".toText() + (groupCache[getGroupId(event)]?.result ?: "释义获取失败！").toText())
+                    .send("\n".toText() + (wordleRoundNow?.result ?: "释义获取失败！").toText())
                 groupCache.remove(getGroupId(event))
             }
 
             ILLEGAL -> {
-                event.content().send("唔……似乎填不进去呢~".toText() + (image ?: "[图片生成失败]".toText()))
+                event.content().send("唔……似乎填不进去呢~".toText() + image)
             }
 
             UNKNOWN -> {
                 event.content()
-                    .send("没有在词库中找到这个词呢……再换一个试试？".toText() + (image ?: "[图片生成失败]".toText()))
+                    .send("没有在词库中找到这个词呢……再换一个试试？".toText() + image)
             }
 
             null -> {
-                event.content().send(image ?: "[图片生成失败]".toText())
+                event.content().send(image)
             }
         }
     }
