@@ -1,5 +1,6 @@
 package top.tbpdt.utils
 
+import kotlinx.serialization.json.jsonObject
 import top.tbpdt.handle.Wordle
 import java.awt.Color
 import java.awt.Dimension
@@ -95,7 +96,8 @@ class WordleRound(
     // 已经猜过的词
     val guessedWords: MutableList<String> = mutableListOf()
 
-    val result: String get() = "【单词】：$word\n【释义】：$chineseMeaning\n$englishMeaning"
+    val result: String
+        get() = "单词: $word\n中释: $chineseMeaning\n英释: $englishMeaning"
 
     fun guess(word: String): GuessResult? {
         val lowerWord = word.lowercase()

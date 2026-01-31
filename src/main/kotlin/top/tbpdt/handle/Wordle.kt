@@ -187,9 +187,13 @@ class Wordle(
 
         // 开始
         val wordLength = argument?.removePrefix("/猜单词")?.trim()?.toIntOrNull() ?: (4..7).random()
+        if (wordLength < 2) {
+            event.content().send("单词长度太短了，没法猜呢……换个长度试一下？")
+            return
+        }
         val word = getRandomWordByLength(wordLength, getGroupIdStr(event))
         if (word == null) {
-            event.content().send("没有找到长度为 $wordLength 的单词呢……")
+            event.content().send("单词长度太长了，没法猜呢……换个长度试一下？")
             return
         }
         groupCache[getGroupId(event)] =
