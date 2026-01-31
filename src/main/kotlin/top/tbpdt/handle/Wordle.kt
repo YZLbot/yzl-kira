@@ -115,108 +115,108 @@ class Wordle(
     @ContentTrim
     @Filter("^/猜单词.*")
     suspend fun startAndHintHandle(event: ChatGroupMessageEvent) {
+        val groupId = getGroupId(event)
+        val groupIdStr = getGroupIdStr(event)
+        val argument = event.messageContent.plainText?.trim()?.removePrefix("/猜单词")?.trim() ?: ""
 
-        val argument = event.messageContent.plainText?.trim()?.removePrefix("/猜单词")?.trim()
-
-        // 不提示却触发了这个功能
-        if (getGroupId(event) in groupCache.keys && argument.isNullOrEmpty()) {
-            event.content().send("本群已经开始了一个猜单词游戏哦，请发送“@我 单词”进行猜词~")
+        // 配置词典，无论游戏是否运行都可以操作
+        if (argument.startsWith("dict")) {
+            handleDictLogic(event, argument, groupIdStr)
             return
         }
 
-        var wordleRoundNow = groupCache[getGroupId(event)] ?: return
+        val wordleRoundNow = groupCache[groupId] // nullable
 
-        // 提示
-        if (argument != null && argument.trim() == "hint") {
-            if (wordleRoundNow.isHinted) {
-                event.content().send("提示机会已经用完了哦，加油~")
-                return
-            }
-            if (!wordleRoundNow.getHint().contains('*')) {
-                event.content().send("唔姆，再提示答案就出来了，阿绫就不告诉你啦，加油~")
-                return
-            }
-            wordleRoundNow.isHinted = true
-            val image = wordleRoundNow.drawHint().toOfflineImage()
-            event.content().send(image)
-            return
-        }
-
-        // 结束
-        if (argument != null && argument.trim() == "exit") {
-            wordleRoundNow.guess(wordleRoundNow.word)
-            val image = wordleRoundNow.draw().toOfflineImage()
-            event.content().send(image)
-            event.content()
-                .send("游戏终止~\n".toText() + wordleRoundNow.result.toText())
-            groupCache.remove(getGroupId(event))
-            return
-        }
-
-        if (getGroupId(event) in groupCache.keys) {
-            return
-        }
-
-        // 选择词库
-        if (argument != null && argument.trim().startsWith("dict")) {
-            val selectedDict: String = argument.removePrefix("dict").trim();
-            if (selectedDict.isEmpty()) {
-                val response = StringBuilder()
-                response.append('\n');
-                for (i in 0..<dictNames.size) {
-                    response.append("[$i] ${dictNames[i]}\n")
+        if (wordleRoundNow != null) {
+            // 正在游戏
+            when (argument) {
+                "hint" -> {
+                    if (wordleRoundNow.isHinted) {
+                        event.content().send("提示机会已经用完了哦，加油~")
+                        return
+                    }
+                    if (!wordleRoundNow.getHint().contains('*')) {
+                        event.content().send("唔姆，再提示答案就出来了，阿绫就不告诉你啦，加油~")
+                        return
+                    }
+                    wordleRoundNow.isHinted = true
+                    val image = wordleRoundNow.drawHint().toOfflineImage()
+                    event.content().send(image)
                 }
-                response.append("当前词库：${dictNames[getdictId(getGroupIdStr(event))]}")
-                response.append("若要修改词库，请发送“@我 /猜单词 dict [词库id]”")
-                event.content().send(response.toString());
+                "exit" -> { // 强制结束
+                    wordleRoundNow.guess(wordleRoundNow.word)
+                    val image = wordleRoundNow.draw().toOfflineImage()
+                    event.content().send(image)
+                    event.content().send("游戏终止~\n".toText() + wordleRoundNow.result.toText())
+                    groupCache.remove(groupId)
+                }
+                "" -> {
+                    // 只发了 "/猜单词"
+                    event.content().send("本群已经开始了一个猜单词游戏哦，请发送“@我 单词”进行猜词~")
+                }
+                else -> {
+                    // "/猜单词 5" or "/猜单词 乱七八糟"
+                    event.content().send("游戏正在进行中！如果要猜词，请直接发送“@我 [单词]”；\n如果想获取提示，请发送“/猜单词 hint”")
+                }
+            }
+        } else {
+            // 未在游戏
+            // 没游戏时发送指令
+            if (argument == "hint" || argument == "exit") {
+                event.content().send("当前没有正在进行的猜单词游戏哦，发送“/猜单词”开始一个吧！")
                 return
             }
-            val selectedDictIdx = selectedDict.toIntOrNull()
-            if (selectedDictIdx == null) {
-                event.content().send("词库id解析失败，请输入纯数字的id哦~")
+            // 校验无效参数
+            if (argument.isNotEmpty() && argument.any { !it.isDigit() }) {
+                event.content().send("没有解析到命令……如果要开始游戏，请发送“/猜单词 [长度]”")
                 return
             }
-            if (selectedDictIdx < 0 || selectedDictIdx > dictNames.size) {
-                event.content().send("词库id超出范围，应为[0,${dictNames.size - 1}]~")
+            // 开始游戏
+            val wordLength = argument.toIntOrNull() ?: (4..7).random()
+            if (wordLength < 2) {
+                event.content().send("单词长度太短了，没法猜呢……换个长度试一下？")
                 return
             }
-            dictIndexes[getGroupIdStr(event)] = selectedDictIdx
-            event.content().send("词库已成功切换为 ${dictNames[selectedDictIdx]}~")
-            return
-        }
-
-        if (argument?.trim()?.any { !it.isDigit() } == true) {
+            val word = getRandomWordByLength(wordLength, groupIdStr)
+            if (word == null) {
+                event.content().send("没有找到长度为 $wordLength 的单词，换个长度试一下？")
+                return
+            }
+            // 初始化
+            val newRound = WordleRound(groupIdStr, word.word, word.chineseExplanation, word.englishExplanation)
+            groupCache[groupId] = newRound
+            logger().info("群 ${event.content().id.shortHash()} 开始猜单词 ${word.word}")
+            val image = newRound.draw().toOfflineImage()
             event.content().send(
-                "没有解析到命令……\n" +
-                        "如果正在猜单词，请发送“@我 ${argument.trim()}”参与猜单词~"
+                image + ("\n猜单词开始！\n" +
+                        "词库：${dictNames[getdictId(groupIdStr)]}\n" +
+                        "发送“@我 [单词]”参与猜单词\n" +
+                        "发送“@我 /猜单词 hint”可获取提示（仅可用一次）\n" +
+                        "发送“@我 /猜单词 exit”结束猜词").toText()
             )
-            return
         }
-
-        // 开始
-        val wordLength = argument?.removePrefix("/猜单词")?.trim()?.toIntOrNull() ?: (4..7).random()
-        if (wordLength < 2) {
-            event.content().send("单词长度太短了，没法猜呢……换个长度试一下？")
-            return
-        }
-        val word = getRandomWordByLength(wordLength, getGroupIdStr(event))
-        if (word == null) {
-            event.content().send("单词长度太长了，没法猜呢……换个长度试一下？")
-            return
-        }
-        wordleRoundNow =
-            WordleRound(getGroupIdStr(event), word.word, word.chineseExplanation, word.englishExplanation)
-        logger().info("群 ${event.content().id.shortHash()} 开始猜单词 ${word.word}")
-        val image = wordleRoundNow.draw().toOfflineImage()
-        event.content().send(
-            image + ("\n猜单词开始！\n" +
-                    "词库：${dictNames[getdictId(getGroupIdStr(event))]}\n" +
-                    "发送“@我 [单词]”参与猜单词\n" +
-                    "发送“@我 /猜单词 hint”可获取提示（仅可用一次）\n" +
-                    "发送“@我 /猜单词 exit”结束猜词").toText()
-        )
     }
 
+    suspend fun handleDictLogic(event: ChatGroupMessageEvent, argument: String, groupIdStr: String) {
+        val selectedDict = argument.removePrefix("dict").trim()
+        if (selectedDict.isEmpty()) {
+            val response = StringBuilder("\n")
+            dictNames.forEachIndexed { i, name -> response.append("[$i] $name\n") }
+            response.append("当前词库：${dictNames[getdictId(groupIdStr)]}\n")
+            response.append("若要修改词库，请发送“/猜单词 dict [词库id]”")
+            event.content().send(response.toString())
+            return
+        }
+
+        val selectedDictIdx = selectedDict.toIntOrNull()
+        if (selectedDictIdx == null || selectedDictIdx !in dictNames.indices) {
+            event.content().send("词库id无效，应为 [0, ${dictNames.size - 1}] 之间的数字~")
+            return
+        }
+
+        dictIndexes[groupIdStr] = selectedDictIdx
+        event.content().send("词库已成功切换为 ${dictNames[selectedDictIdx]}~")
+    }
 
     @Listener
     @ContentTrim
